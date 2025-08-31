@@ -18,8 +18,29 @@ def get_local_ip():
     try:
         # Check if running in Docker by looking for dockerenv file
         if os.path.exists('/.dockerenv'):
-            # In Docker, show localhost since we can't reliably get host VM IP
-            return 'localhost'
+            # In Docker, try to get the host's IP address
+            try:
+                import subprocess
+                # Try to get the default gateway (Docker host)
+                result = subprocess.run(['ip', 'route', 'show', 'default'], 
+                                      capture_output=True, text=True, timeout=5)
+                if result.returncode == 0:
+                    # Parse the default gateway IP
+                    for line in result.stdout.strip().split('\n'):
+                        if 'default via' in line:
+                            gateway_ip = line.split('via')[1].split()[0]
+                            return gateway_ip
+                
+                # Fallback: try to get the host IP from the bridge network
+                result = subprocess.run(['ip', 'route', 'show', '0.0.0.0/0'], 
+                                      capture_output=True, text=True, timeout=5)
+                if result.returncode == 0:
+                    for line in result.stdout.strip().split('\n'):
+                        if 'via' in line:
+                            gateway_ip = line.split('via')[1].split()[0]
+                            return gateway_ip
+            except:
+                pass
         
         # Standard method for non-Docker environments
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -45,7 +66,10 @@ if __name__ == '__main__':
     
     # Show appropriate network message based on environment
     if os.path.exists('/.dockerenv'):
-        print(f"🐳 Docker:        Access via your host VM's IP on port {port}", file=sys.stderr)
+        if local_ip != 'localhost':
+            print(f"🐳 Docker Host:   http://{local_ip}:{port}", file=sys.stderr)
+        else:
+            print(f"🐳 Docker:        Check your host machine's IP address", file=sys.stderr)
     else:
         print(f"🌐 Network:       http://{local_ip}:{port}", file=sys.stderr)
     
