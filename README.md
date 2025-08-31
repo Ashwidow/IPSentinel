@@ -108,7 +108,6 @@ Customize behavior with environment variables:
 # docker-compose.yml
 environment:
   - PORT=7450                    # Web interface port
-  - HOST=0.0.0.0                # Listen address
   - SCHEDULE=*/30 * * * *        # Default schedule
   - DISCORD_WEBHOOK_URL=https... # Discord notifications
   - PUSHOVER_TOKEN=your_token    # Pushover notifications

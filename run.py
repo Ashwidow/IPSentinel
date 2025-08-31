@@ -16,11 +16,21 @@ os.environ['WERKZEUG_RUN_MAIN'] = 'true'
 
 def get_local_ip():
     try:
-        # Get local IP address
+        # Check if running in Docker by looking for dockerenv file
+        if os.path.exists('/.dockerenv'):
+            # In Docker, show localhost since we can't reliably get host VM IP
+            return 'localhost'
+        
+        # Standard method for non-Docker environments
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(('8.8.8.8', 80))
         ip = s.getsockname()[0]
         s.close()
+        
+        # If we got a Docker internal IP, fallback to localhost
+        if ip.startswith('172.17.') or ip.startswith('172.18.') or ip.startswith('172.19.'):
+            return 'localhost'
+            
         return ip
     except:
         return 'localhost'
@@ -32,7 +42,14 @@ if __name__ == '__main__':
     # Print startup message to stderr so it shows in Docker logs
     print(f"\n✨ IP Sentinel is running!", file=sys.stderr)
     print(f"📡 Local access:  http://localhost:{port}", file=sys.stderr)
-    print(f"🌐 Network:       http://{local_ip}:{port}\n", file=sys.stderr)
+    
+    # Show appropriate network message based on environment
+    if os.path.exists('/.dockerenv'):
+        print(f"🐳 Docker:        Access via your host VM's IP on port {port}", file=sys.stderr)
+    else:
+        print(f"🌐 Network:       http://{local_ip}:{port}", file=sys.stderr)
+    
+    print("", file=sys.stderr)  # Empty line
     sys.stderr.flush()
     
     # Redirect stdout and stderr to suppress Flask startup messages
