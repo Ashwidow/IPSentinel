@@ -1,0 +1,382 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="fa fa-cog me-2"></i>
+                Settings
+            </h2>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Schedule Settings -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fa fa-clock-o me-2"></i>
+                        Schedule Settings
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="scheduleForm">
+                        <div class="mb-3">
+                            <label for="checkInterval" class="form-label">Check Interval</label>
+                            <select class="form-select" id="checkInterval" name="interval" onchange="toggleCustomCron()">
+                                <option value="60">Every 1 minute</option>
+                                <option value="300" selected>Every 5 minutes</option>
+                                <option value="1800">Every 30 minutes</option>
+                                <option value="3600">Every 1 hour</option>
+                                <option value="21600">Every 6 hours</option>
+                                <option value="86400">Every 24 hours</option>
+                                <option value="custom">Custom CRON expression...</option>
+                            </select>
+                            <div class="form-text">How often IP Sentinel should check for IP changes</div>
+                        </div>
+
+                        <div class="mb-3" id="customCronDiv" style="display: none;">
+                            <label for="customCron" class="form-label">Custom CRON Expression</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="customCron" name="customCron" 
+                                       placeholder="*/5 * * * *" 
+                                       pattern="^(\*|[0-5]?[0-9])(\s+(\*|[01]?[0-9]|2[0-3]))(\s+(\*|[0-2]?[0-9]|3[01]))(\s+(\*|[0-9]|1[0-2]))(\s+(\*|[0-6]))$">
+                                <button class="btn btn-outline-info" type="button" onclick="showCronHelp()">
+                                    <i class="fa fa-question-circle"></i>
+                                </button>
+                            </div>
+                            <div class="form-text">
+                                Format: minute hour day month weekday<br>
+                                Example: <code>*/5 * * * *</code> = every 5 minutes
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="enableMonitoring" checked>
+                                <label class="form-check-label" for="enableMonitoring">
+                                    Enable IP Monitoring
+                                </label>
+                            </div>
+                            <div class="form-text">Turn monitoring on or off</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fa fa-save me-2"></i>
+                            Save Schedule Settings
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- General Settings -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fa fa-gear me-2"></i>
+                        General Settings
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="generalForm">
+                        <div class="mb-3">
+                            <label for="retainLogs" class="form-label">Retain Logs (days)</label>
+                            <input type="number" class="form-control" id="retainLogs" name="retainLogs" 
+                                   value="30" min="1" max="365">
+                            <div class="form-text">Number of days to keep IP change history and log files</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="autoCleanup" checked>
+                                <label class="form-check-label" for="autoCleanup">
+                                    Auto-cleanup old records
+                                </label>
+                            </div>
+                            <div class="form-text">Automatically remove old IP change records and log files</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="debugEnabled" onchange="toggleDebug()">
+                                <label class="form-check-label" for="debugEnabled">
+                                    Enable debug logging
+                                </label>
+                            </div>
+                            <div class="form-text">Show detailed logging information for notifications and system operations</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fa fa-save me-2"></i>
+                            Save General Settings
+                        </button>
+                    </form>
+                    
+                    <hr class="my-4">
+                    
+                    <!-- Clear Logs Section -->
+                    <div class="alert alert-warning" role="alert">
+                        <h6 class="alert-heading mb-2">
+                            <i class="fa fa-exclamation-triangle me-2"></i>
+                            Clear Log Data
+                        </h6>
+                        <p class="mb-3">This will permanently delete all IP change history and reset statistics. This action cannot be undone.</p>
+                        <button type="button" class="btn btn-danger" onclick="clearLogs()">
+                            <i class="fa fa-trash me-2"></i>
+                            Clear All Logs
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load current settings
+    loadCurrentSettings();
+    loadDebugSettings();
+    
+    // Schedule form submission
+    document.getElementById('scheduleForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const intervalSelect = document.getElementById('checkInterval');
+        const customCron = document.getElementById('customCron');
+        
+        let requestData;
+        
+        if (intervalSelect.value === 'custom') {
+            // Send custom CRON expression
+            if (!customCron.value.trim()) {
+                showToast('Please enter a CRON expression', 'error');
+                return;
+            }
+            requestData = { cron: customCron.value.trim() };
+        } else {
+            // Send interval in seconds
+            const interval = parseInt(intervalSelect.value);
+            requestData = { interval: interval };
+            console.log('Sending interval request:', requestData);
+        }
+        
+        fetch('/api/schedule', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Schedule update response:', data);
+            if (data.status === 'success') {
+                showToast('Schedule updated successfully', 'success');
+                loadCurrentSettings();
+                // Update the next check time in the sidebar
+                if (typeof updateNextCheck === 'function') {
+                    setTimeout(updateNextCheck, 1000); // Wait a second for the backend to update
+                }
+            } else {
+                showToast('Failed to update schedule: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error updating schedule', 'error');
+            console.error('Error:', error);
+        });
+    });
+
+    // General form submission
+    document.getElementById('generalForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        showToast('General settings saved', 'success');
+    });
+});
+
+function loadCurrentSettings() {
+    // Load current schedule settings
+    fetch('/api/schedule')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                console.log('Current schedule:', data.data);
+                
+                // Try to match the current schedule to an interval option
+                const scheduleData = data.data;
+                const intervalSelect = document.getElementById('checkInterval');
+                const customCronDiv = document.getElementById('customCronDiv');
+                const customCronInput = document.getElementById('customCron');
+                
+                // Try to reverse-engineer the interval from the cron expression
+                const schedule = scheduleData.schedule;
+                let matchedInterval = null;
+                
+                // Check common patterns
+                if (schedule === '* * * * *') {
+                    matchedInterval = '60'; // Every minute
+                } else if (schedule === '*/5 * * * *') {
+                    matchedInterval = '300'; // Every 5 minutes
+                } else if (schedule === '*/30 * * * *') {
+                    matchedInterval = '1800'; // Every 30 minutes
+                } else if (schedule === '0 * * * *') {
+                    matchedInterval = '3600'; // Every hour
+                } else if (schedule === '0 */6 * * *') {
+                    matchedInterval = '21600'; // Every 6 hours
+                } else if (schedule === '0 0 * * *') {
+                    matchedInterval = '86400'; // Every 24 hours
+                } else {
+                    // Custom CRON expression
+                    intervalSelect.value = 'custom';
+                    customCronDiv.style.display = 'block';
+                    customCronInput.value = schedule;
+                    return;
+                }
+                
+                if (matchedInterval) {
+                    intervalSelect.value = matchedInterval;
+                    customCronDiv.style.display = 'none';
+                } else {
+                    // Fallback to custom
+                    intervalSelect.value = 'custom';
+                    customCronDiv.style.display = 'block';
+                    customCronInput.value = schedule;
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error loading settings:', error);
+        });
+}
+
+function toggleCustomCron() {
+    const intervalSelect = document.getElementById('checkInterval');
+    const customCronDiv = document.getElementById('customCronDiv');
+    
+    if (intervalSelect.value === 'custom') {
+        customCronDiv.style.display = 'block';
+        document.getElementById('customCron').focus();
+    } else {
+        customCronDiv.style.display = 'none';
+    }
+}
+
+function showCronHelp() {
+    const helpText = `CRON Expression Format:
+    
+minute hour day month weekday
+
+Examples:
+• */5 * * * *    = Every 5 minutes
+• */30 * * * *   = Every 30 minutes
+• 0 * * * *      = Every hour
+• 0 */6 * * *    = Every 6 hours
+• 0 0 * * *      = Daily at midnight
+• 0 0 * * 1      = Every Monday at midnight
+• 30 6 * * 1-5   = 6:30 AM, Monday-Friday
+
+Wildcards:
+• *    = Any value
+• */n  = Every n units
+• n-m  = Range from n to m
+• n,m  = Values n and m`;
+    
+    alert(helpText);
+}
+
+function clearLogs() {
+    // Show confirmation dialog
+    if (!confirm('⚠️ This will permanently delete all IP change history and reset statistics.\n\nThis action cannot be undone. Are you sure you want to continue?')) {
+        return;
+    }
+    
+    // Second confirmation for safety
+    if (!confirm('🗑️ Last chance! This will delete ALL log data and cannot be recovered.\n\nClick OK to proceed with clearing all logs.')) {
+        return;
+    }
+    
+    fetch('/api/logs/clear', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                showToast('All logs and statistics have been cleared', 'success');
+                
+                // Optionally reload the page to refresh any displayed data
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            } else {
+                showToast('Error clearing logs: ' + (data.message || 'Unknown error'), 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error clearing logs: ' + error.message, 'error');
+            console.error('Error:', error);
+        });
+}
+
+function showToast(message, type = 'info') {
+    const toast = document.getElementById('toast');
+    const toastBody = toast.querySelector('.toast-body');
+    
+    toastBody.textContent = message;
+    
+    // Update toast styling based on type
+    toast.className = 'toast';
+    if (type === 'success') {
+        toast.classList.add('text-bg-success');
+    } else if (type === 'error') {
+        toast.classList.add('text-bg-danger');
+    } else if (type === 'warning') {
+        toast.classList.add('text-bg-warning');
+    } else {
+        toast.classList.add('text-bg-info');
+    }
+    
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+}
+
+function loadDebugSettings() {
+    fetch('/api/notifications/debug')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('debugEnabled').checked = data.debug || false;
+        })
+        .catch(error => {
+            console.error('Error loading debug settings:', error);
+        });
+}
+
+function toggleDebug() {
+    const enabled = document.getElementById('debugEnabled').checked;
+    
+    fetch('/api/notifications/debug', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            enabled: enabled
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showToast(`Debug logging ${enabled ? 'enabled' : 'disabled'}`, 'success');
+        } else {
+            showToast('Error updating debug settings', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error updating debug settings:', error);
+        showToast('Error updating debug settings', 'error');
+    });
+}
+</script>
+{% endblock %}

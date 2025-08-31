@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  ip-sentinel:
+    build: .
+    container_name: ip-sentinel
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    ports:
+      - "7450:7450"
+    environment:
+      - PORT=7450
+      - HOST=0.0.0.0
+
+networks:
+  default:
+    driver: bridge

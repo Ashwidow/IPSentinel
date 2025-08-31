@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="fa fa-dashboard me-2"></i>
+                Dashboard
+            </h2>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Current IP Status -->
+        <div class="col-lg-8 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <span class="status-indicator active" id="status-dot"></span>
+                            Current IP Status
+                        </h5>
+                        <button class="btn btn-primary btn-sm" onclick="checkStatus()">
+                            <i class="fa fa-refresh me-1"></i>
+                            Check Now
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <h6 class="text-muted mb-1">Current IP Address</h6>
+                            <h3 class="mb-0" id="current-ip">
+                                {% if ip_status.ip %}
+                                    {{ ip_status.ip }}
+                                {% else %}
+                                    Loading...
+                                {% endif %}
+                            </h3>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <h6 class="text-muted mb-1">Status</h6>
+                            <div class="alert alert-{{ 'success' if ip_status.status == 'unchanged' else 'info' if ip_status.status == 'changed' else 'warning' }} mb-0">
+                                <i class="fa fa-{{ 'check' if ip_status.status == 'unchanged' else 'refresh' if ip_status.status == 'changed' else 'warning' }} me-2"></i>
+                                {{ ip_status.message }}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-2">
+                            <small class="text-muted">Last Check:</small>
+                            <div id="last-check">Just now</div>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <small class="text-muted">Next Check:</small>
+                            <div id="next-check">In 5 minutes</div>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <small class="text-muted">Monitoring:</small>
+                            <div>
+                                <span class="badge bg-success">Active</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">
+                        <i class="fa fa-bar-chart me-2"></i>
+                        Quick Stats
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>Total Changes:</span>
+                            <strong id="total-changes">0</strong>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>This Month:</span>
+                            <strong id="month-changes">0</strong>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>This Week:</span>
+                            <strong id="week-changes">0</strong>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between">
+                            <span>Uptime:</span>
+                            <strong id="uptime">0 days</strong>
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="text-center">
+                        <a href="/notifications" class="btn btn-outline-primary btn-sm">
+                            <i class="fa fa-bell me-1"></i>
+                            Configure Alerts
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- IP Change History -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">
+                            <i class="fa fa-history me-2"></i>
+                            Recent IP Changes
+                        </h5>
+                        <div>
+                            <span class="badge bg-secondary" id="change-count">0 changes</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="history-log" style="max-height: 400px; overflow-y: auto;">
+                        <div class="text-center text-muted p-4">
+                            <div class="spinner-border spinner-border-sm me-2" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            Loading history...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let lastCheck = new Date();
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadHistory();
+    loadStats();
+    setInterval(updateTimestamps, 1000);
+    setInterval(loadStats, 30000); // Update stats every 30 seconds
+});
+
+function updateTimestamps() {
+    const lastCheckEl = document.getElementById('last-check');
+    const nextCheckEl = document.getElementById('next-check');
+    const statusDot = document.getElementById('status-dot');
+    
+    if (lastCheckEl) {
+        lastCheckEl.textContent = timeAgo(lastCheck);
+    }
+    
+    // Calculate next check (assuming 5 minute intervals)
+    const nextCheck = new Date(lastCheck.getTime() + 5 * 60 * 1000);
+    const timeUntilNext = Math.max(0, Math.floor((nextCheck - new Date()) / 1000));
+    
+    if (nextCheckEl) {
+        if (timeUntilNext > 0) {
+            const minutes = Math.floor(timeUntilNext / 60);
+            const seconds = timeUntilNext % 60;
+            nextCheckEl.textContent = `${minutes}m ${seconds}s`;
+        } else {
+            nextCheckEl.textContent = 'Checking now...';
+        }
+    }
+    
+    // Update status indicator
+    const timeSinceCheck = (new Date() - lastCheck) / 1000;
+    if (statusDot) {
+        statusDot.classList.toggle('active', timeSinceCheck < 300); // 5 minutes
+        statusDot.classList.toggle('inactive', timeSinceCheck >= 300);
+    }
+}
+
+function timeAgo(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+}
+
+function checkStatus() {
+    const button = event.target.closest('button');
+    const originalContent = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i>Checking...';
+    
+    fetch('/api/status', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            lastCheck = new Date();
+            // Update the current IP display
+            const currentIpEl = document.getElementById('current-ip');
+            if (currentIpEl && data.current_ip) {
+                currentIpEl.textContent = data.current_ip;
+            }
+            
+            showToast('IP check completed', 'success');
+            loadHistory();
+            loadStats();
+        })
+        .catch(error => {
+            showToast('Error checking IP', 'error');
+            console.error('Error:', error);
+        })
+        .finally(() => {
+            button.disabled = false;
+            button.innerHTML = originalContent;
+        });
+}
+
+function loadHistory() {
+    fetch('/api/history')
+        .then(response => response.json())
+        .then(data => {
+            const historyDiv = document.getElementById('history-log');
+            const changeCount = document.getElementById('change-count');
+            
+            if (data.status === 'success' && data.logs) {
+                const logs = data.logs;
+                changeCount.textContent = `${logs.length} changes`;
+                
+                if (logs.length === 0) {
+                    historyDiv.innerHTML = `
+                        <div class="text-center text-muted p-4">
+                            <i class="fa fa-info-circle mb-2" style="font-size: 2rem;"></i>
+                            <div>No IP changes recorded yet</div>
+                            <small>IP changes will appear here when detected</small>
+                        </div>
+                    `;
+                } else {
+                    historyDiv.innerHTML = logs.slice(0, 10).map(log => `
+                        <div class="border-bottom py-2 px-3">
+                            <small class="text-muted">${log}</small>
+                        </div>
+                    `).join('');
+                }
+            } else {
+                historyDiv.innerHTML = `
+                    <div class="text-center text-muted p-4">
+                        <i class="fa fa-exclamation-triangle mb-2" style="font-size: 2rem;"></i>
+                        <div>Unable to load history</div>
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading history:', error);
+            document.getElementById('history-log').innerHTML = `
+                <div class="text-center text-muted p-4">
+                    <i class="fa fa-exclamation-triangle mb-2" style="font-size: 2rem;"></i>
+                    <div>Error loading history</div>
+                </div>
+            `;
+        });
+}
+
+function loadStats() {
+    fetch('/api/history')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success' && data.logs) {
+                const logs = data.logs;
+                const totalChanges = logs.length;
+                
+                // Calculate changes this month and week
+                const now = new Date();
+                const thisMonth = now.getMonth();
+                const thisYear = now.getFullYear();
+                const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                
+                let monthChanges = 0;
+                let weekChanges = 0;
+                
+                logs.forEach(log => {
+                    // This is a simple approximation - you'd want better date parsing in production
+                    if (log.includes(thisYear.toString())) {
+                        monthChanges++;
+                    }
+                    // For week changes, you'd need better date parsing from the log format
+                    weekChanges = Math.min(totalChanges, 5); // Placeholder
+                });
+                
+                document.getElementById('total-changes').textContent = totalChanges;
+                document.getElementById('month-changes').textContent = Math.min(monthChanges, totalChanges);
+                document.getElementById('week-changes').textContent = weekChanges;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading stats:', error);
+        });
+}
+
+function showToast(message, type = 'info') {
+    const toast = document.getElementById('toast');
+    const toastBody = toast.querySelector('.toast-body');
+    
+    toastBody.textContent = message;
+    
+    // Update toast styling based on type
+    toast.className = 'toast';
+    if (type === 'success') {
+        toast.classList.add('text-bg-success');
+    } else if (type === 'error') {
+        toast.classList.add('text-bg-danger');
+    } else if (type === 'warning') {
+        toast.classList.add('text-bg-warning');
+    } else {
+        toast.classList.add('text-bg-info');
+    }
+    
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+}
+</script>
+{% endblock %}

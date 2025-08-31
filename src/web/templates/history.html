@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IP History</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    {% include 'base.html' %}
+    <div class="container">
+        <h1>IP Address History</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Public IP Address</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for entry in ip_history %}
+                <tr>
+                    <td>{{ entry.date }}</td>
+                    <td>{{ entry.ip_address }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <a href="{{ url_for('index') }}">Back to Home</a>
+    </div>
+</body>
+</html>

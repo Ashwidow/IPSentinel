@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">
+                <i class="fa fa-bell me-2"></i>
+                Notifications
+            </h2>
+        </div>
+    </div>
+
+    <!-- Notification Channels -->
+    <div class="row">
+        <!-- Discord Channel Card -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fa fa-discord me-2"></i>Discord
+                    </h5>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="discordEnabled">
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form id="discordForm">
+                        <div class="mb-3">
+                            <label class="form-label">Webhook URL</label>
+                            <input type="url" class="form-control" id="discordWebhook" 
+                                   placeholder="https://discord.com/api/webhooks/...">
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Save Settings</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="testDiscordNotification()">
+                                <i class="fa fa-flask me-1"></i>Test
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pushover Channel Card -->
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fa fa-mobile me-2"></i>Pushover
+                    </h5>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="pushoverEnabled">
+                    </div>
+                </div>
+                <div class="card-body">
+                    <form id="pushoverForm">
+                        <div class="mb-3">
+                            <label class="form-label">User Key</label>
+                            <input type="text" class="form-control" id="pushoverUserKey" 
+                                   placeholder="Enter your Pushover user key">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">API Token</label>
+                            <input type="text" class="form-control" id="pushoverApiToken" 
+                                   placeholder="Enter your Pushover API token">
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Save Settings</button>
+                            <button type="button" class="btn btn-outline-secondary" onclick="testPushoverNotification()">
+                                <i class="fa fa-flask me-1"></i>Test
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('discordForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const webhookUrl = document.getElementById('discordWebhook').value;
+    const enabled = document.getElementById('discordEnabled').checked;
+    
+    fetch('/api/notifications/discord', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            enabled: enabled,
+            webhook_url: webhookUrl,
+            events: ['ip_change'] // Default to IP change notifications
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showToast('Discord settings saved successfully', 'success');
+        } else {
+            showToast('Failed to save Discord settings', 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error saving Discord settings', 'error');
+        console.error('Error:', error);
+    });
+});
+
+document.getElementById('pushoverForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const userKey = document.getElementById('pushoverUserKey').value;
+    const apiToken = document.getElementById('pushoverApiToken').value;
+    const enabled = document.getElementById('pushoverEnabled').checked;
+    
+    fetch('/api/notifications/pushover', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            enabled: enabled,
+            user_key: userKey,
+            api_token: apiToken,
+            events: ['ip_change'] // Default to IP change notifications
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showToast('Pushover settings saved successfully', 'success');
+        } else {
+            showToast('Failed to save Pushover settings', 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error saving Pushover settings', 'error');
+        console.error('Error:', error);
+    });
+});
+
+function testDiscordNotification() {
+    const button = event.target.closest('button');
+    const originalContent = button.innerHTML;
+    const webhookUrl = document.getElementById('discordWebhook').value;
+    
+    if (!webhookUrl) {
+        showToast('Please enter a Discord webhook URL first', 'error');
+        return;
+    }
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i>Testing...';
+    
+    fetch('/api/notifications/test', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+            service: 'discord',
+            webhook_url: webhookUrl
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showToast('Discord test notification sent successfully!', 'success');
+        } else {
+            showToast(`Discord test failed: ${data.message}`, 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error sending Discord test notification', 'error');
+        console.error('Error:', error);
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.innerHTML = originalContent;
+    });
+}
+
+function testPushoverNotification() {
+    const button = event.target.closest('button');
+    const originalContent = button.innerHTML;
+    const userKey = document.getElementById('pushoverUserKey').value;
+    const apiToken = document.getElementById('pushoverApiToken').value;
+    
+    if (!userKey || !apiToken) {
+        showToast('Please enter both Pushover user key and API token first', 'error');
+        return;
+    }
+    
+    button.disabled = true;
+    button.innerHTML = '<i class="fa fa-spinner fa-spin me-1"></i>Testing...';
+    
+    fetch('/api/notifications/test', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+            service: 'pushover',
+            user_key: userKey,
+            api_token: apiToken
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showToast('Pushover test notification sent successfully!', 'success');
+        } else {
+            showToast(`Pushover test failed: ${data.message}`, 'error');
+        }
+    })
+    .catch(error => {
+        showToast('Error sending Pushover test notification', 'error');
+        console.error('Error:', error);
+    })
+    .finally(() => {
+        button.disabled = false;
+        button.innerHTML = originalContent;
+    });
+}
+
+function showToast(message, type = 'info') {
+    const toast = document.getElementById('toast');
+    const toastBody = toast.querySelector('.toast-body');
+    const toastIcon = toast.querySelector('.toast-header i');
+    
+    // Update toast content
+    toastBody.textContent = message;
+    
+    // Update icon based on type
+    toastIcon.className = type === 'success' ? 'fa fa-check-circle me-2 text-success' : 
+                         type === 'error' ? 'fa fa-exclamation-circle me-2 text-danger' : 
+                         'fa fa-info-circle me-2';
+    
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+}
+
+// Load existing notification settings when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadNotificationSettings();
+});
+
+function loadNotificationSettings() {
+    fetch('/api/notifications')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                const config = data.data;
+                
+                // Load Discord settings
+                if (config.discord) {
+                    document.getElementById('discordEnabled').checked = config.discord.enabled || false;
+                    document.getElementById('discordWebhook').value = config.discord.webhook_url || '';
+                }
+                
+                // Load Pushover settings
+                if (config.pushover) {
+                    document.getElementById('pushoverEnabled').checked = config.pushover.enabled || false;
+                    document.getElementById('pushoverUserKey').value = config.pushover.user_key || '';
+                    document.getElementById('pushoverApiToken').value = config.pushover.api_token || '';
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error loading notification settings:', error);
+        });
+}
+</script>
+{% endblock %}
