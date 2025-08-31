@@ -29,9 +29,11 @@ if __name__ == '__main__':
     port = int(os.getenv('PORT', 7450))
     local_ip = get_local_ip()
     
-    print(f"\n✨ IP Sentinel is running!")
-    print(f"📡 Local access:  http://localhost:{port}")
-    print(f"🌐 Network:       http://{local_ip}:{port}\n")
+    # Print startup message to stderr so it shows in Docker logs
+    print(f"\n✨ IP Sentinel is running!", file=sys.stderr)
+    print(f"📡 Local access:  http://localhost:{port}", file=sys.stderr)
+    print(f"🌐 Network:       http://{local_ip}:{port}\n", file=sys.stderr)
+    sys.stderr.flush()
     
     # Redirect stdout and stderr to suppress Flask startup messages
     class DevNull:
@@ -43,10 +45,6 @@ if __name__ == '__main__':
     original_stdout = sys.stdout
     original_stderr = sys.stderr
     
-    # Temporarily redirect output
-    sys.stdout = DevNull()
-    sys.stderr = DevNull()
-    
     try:
         app = create_app()
         app.logger.disabled = True
@@ -55,13 +53,13 @@ if __name__ == '__main__':
         from werkzeug.serving import make_server
         server = make_server('0.0.0.0', port, app, threaded=True)
         
-        # Restore output for our message
-        sys.stdout = original_stdout
-        sys.stderr = original_stderr
+        # Only suppress output after the server starts
+        sys.stdout = DevNull()
+        sys.stderr = DevNull()
         
         server.serve_forever()
         
     except KeyboardInterrupt:
         sys.stdout = original_stdout
         sys.stderr = original_stderr
-        print("\n👋 IP Sentinel stopped")
+        print("\n👋 IP Sentinel stopped", file=sys.stderr)

@@ -9,8 +9,6 @@
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://docker.com)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-![IP Sentinel Dashboard](https://via.placeholder.com/800x400/2c3e50/ecf0f1?text=IP+Sentinel+Dashboard)
-
 </div>
 
 ## ✨ Features
