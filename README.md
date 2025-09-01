@@ -197,7 +197,6 @@ services:
       - ./logs:/app/logs
     environment:
       - PORT=7450
-      - HOST=0.0.0.0
     restart: unless-stopped
 ```
 
