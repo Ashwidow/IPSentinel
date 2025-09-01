@@ -220,7 +220,6 @@ docker run -d \
   -v $(pwd)/logs:/app/logs \
   ip-sentinel
 ```
-
 ## 🔧 Development
 
 ### Setting Up Development Environment

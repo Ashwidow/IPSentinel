@@ -19,5 +19,5 @@ RUN mkdir -p data logs
 # Expose the port the app runs on
 EXPOSE 7450
 
-# Command to run the application
+# Set the command to run the application
 CMD ["python", "run.py"]

@@ -3,6 +3,7 @@ import socket
 import os
 import logging
 import sys
+import subprocess
 from io import StringIO
 
 # Completely suppress all Flask and Werkzeug logging
@@ -16,62 +17,27 @@ os.environ['WERKZEUG_RUN_MAIN'] = 'true'
 
 def get_local_ip():
     try:
-        # Check if running in Docker by looking for dockerenv file
-        if os.path.exists('/.dockerenv'):
-            # In Docker, try to get the host's IP address
-            try:
-                import subprocess
-                # Try to get the default gateway (Docker host)
-                result = subprocess.run(['ip', 'route', 'show', 'default'], 
-                                      capture_output=True, text=True, timeout=5)
-                if result.returncode == 0:
-                    # Parse the default gateway IP
-                    for line in result.stdout.strip().split('\n'):
-                        if 'default via' in line:
-                            gateway_ip = line.split('via')[1].split()[0]
-                            return gateway_ip
-                
-                # Fallback: try to get the host IP from the bridge network
-                result = subprocess.run(['ip', 'route', 'show', '0.0.0.0/0'], 
-                                      capture_output=True, text=True, timeout=5)
-                if result.returncode == 0:
-                    for line in result.stdout.strip().split('\n'):
-                        if 'via' in line:
-                            gateway_ip = line.split('via')[1].split()[0]
-                            return gateway_ip
-            except:
-                pass
+        # Use HOST_IP environment variable if set
+        host_ip = os.environ.get('HOST_IP')
+        if host_ip and host_ip.strip():
+            return host_ip.strip()
         
-        # Standard method for non-Docker environments
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(('8.8.8.8', 80))
-        ip = s.getsockname()[0]
-        s.close()
-        
-        # If we got a Docker internal IP, fallback to localhost
-        if ip.startswith('172.17.') or ip.startswith('172.18.') or ip.startswith('172.19.'):
-            return 'localhost'
-            
-        return ip
+        return 'localhost'
     except:
         return 'localhost'
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 7450))
+    port = 7450
     local_ip = get_local_ip()
     
     # Print startup message to stderr so it shows in Docker logs
     print(f"\n✨ IP Sentinel is running!", file=sys.stderr)
-    print(f"📡 Local access:  http://localhost:{port}", file=sys.stderr)
+    print(f"✅ App is accessible at:", file=sys.stderr)
+    print(f"   - http://localhost:{port}", file=sys.stderr)
     
-    # Show appropriate network message based on environment
-    if os.path.exists('/.dockerenv'):
-        if local_ip != 'localhost':
-            print(f"🐳 Docker Host:   http://{local_ip}:{port}", file=sys.stderr)
-        else:
-            print(f"🐳 Docker:        Check your host machine's IP address", file=sys.stderr)
-    else:
-        print(f"🌐 Network:       http://{local_ip}:{port}", file=sys.stderr)
+    # Show the detected host IP if it's not localhost
+    if local_ip != 'localhost':
+        print(f"   - http://{local_ip}:{port}", file=sys.stderr)
     
     print("", file=sys.stderr)  # Empty line
     sys.stderr.flush()
